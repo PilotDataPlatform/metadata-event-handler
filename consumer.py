@@ -1,7 +1,9 @@
+import json
+
 from kafka3 import KafkaConsumer
+
 from ESItemModel import ESItemModel
 from utils import decode_path_from_ltree
-import json
 
 remote_broker = '10.3.7.113:9092'
 local_broker = '127.0.0.1:9092'

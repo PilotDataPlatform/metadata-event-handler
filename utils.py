@@ -1,6 +1,7 @@
 import base64
 import math
 
+
 def decode_label_from_ltree(encoded_string: str) -> str:
     missing_padding = math.ceil(len(encoded_string) / 8) * 8 - len(encoded_string)
     if missing_padding:
