@@ -15,25 +15,25 @@
 
 import json
 
-from kafka3 import KafkaConsumer
 from elasticsearch import Elasticsearch
+from kafka3 import KafkaConsumer
 
+from config import ELASTICSEARCH_SERVICE
+from config import KAKFA_SERVICE
 from ESItemModel import ESItemModel
 from utils import decode_path_from_ltree
 
-kafka_url = '10.3.7.113:9092'
 kafka_topics = ['metadata.metadata.items', 'metadata.metadata.extended']
-es_url = 'http://10.3.7.219:9200'
 es_index = 'metadata-items'
 
-consumer = KafkaConsumer(bootstrap_servers=[kafka_url])
+consumer = KafkaConsumer(bootstrap_servers=[KAKFA_SERVICE])
 consumer.subscribe(kafka_topics)
 
 pending_items = {}
 
 def write_item_to_es(es_item: ESItemModel, item_id: str):
     print(f'Writing to ElasticSearch ({item_id})')
-    es_client = Elasticsearch(es_url)
+    es_client = Elasticsearch(ELASTICSEARCH_SERVICE)
     doc = es_item.to_dict()
     es_client.index(index=es_index, body=doc)
     es_client.close()
