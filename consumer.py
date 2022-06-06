@@ -1,26 +1,31 @@
 import json
 
 from kafka3 import KafkaConsumer
+from elasticsearch import Elasticsearch
 
 from ESItemModel import ESItemModel
 from utils import decode_path_from_ltree
 
-remote_broker = '10.3.7.113:9092'
-local_broker = '127.0.0.1:9092'
-topics = ['metadata.metadata.items', 'metadata.metadata.extended']
+kafka_url = '10.3.7.113:9092'
+kafka_topics = ['metadata.metadata.items', 'metadata.metadata.extended']
+es_url = 'http://10.3.7.219:9200'
+es_index = 'metadata-items'
 
-consumer = KafkaConsumer(bootstrap_servers=[remote_broker])
-consumer.subscribe(topics)
+consumer = KafkaConsumer(bootstrap_servers=[kafka_url])
+consumer.subscribe(kafka_topics)
 
 pending_items = {}
 
-def write_item_to_es(es_item: ESItemModel):
-    print('Writing to ElasticSearch')
-    print(es_item.to_dict())
+def write_item_to_es(es_item: ESItemModel, item_id: str):
+    print(f'Writing to ElasticSearch ({item_id})')
+    es_client = Elasticsearch(es_url)
+    doc = es_item.to_dict()
+    es_client.index(index=es_index, body=doc)
+    es_client.close()
 
 def parse_items_message(message):
     item_id = message['payload']['id']
-    print(f'Received items event: {item_id}')
+    print(f'Consumed items event ({item_id})')
     es_item = ESItemModel()
     if item_id in pending_items:
         es_item = pending_items[item_id]
@@ -41,13 +46,13 @@ def parse_items_message(message):
     es_item.items_set = True
     if es_item.is_complete():
         pending_items.pop(item_id)
-        write_item_to_es(es_item)
+        write_item_to_es(es_item, item_id)
     else:
         pending_items[item_id] = es_item
 
 def parse_extended_message(message):
     item_id = message['payload']['item_id']
-    print(f'Received extended event: {item_id}')
+    print(f'Consumed extended event ({item_id})')
     es_item = ESItemModel()
     if item_id in pending_items:
         es_item = pending_items[item_id]
@@ -59,7 +64,7 @@ def parse_extended_message(message):
     es_item.extended_set = True
     if es_item.is_complete():
         pending_items.pop(item_id)
-        write_item_to_es(es_item)
+        write_item_to_es(es_item, item_id)
     else:
         pending_items[item_id] = es_item
 
