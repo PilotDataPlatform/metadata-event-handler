@@ -1,0 +1,14 @@
+# Folders
+.git
+.venv
+venv
+kubernetes
+
+# Files
+.DS_Store
+.gitignore
+.gitlab-ci*
+gitlab-ci*
+.github
+Dockerfile*
+Jenkinsfile

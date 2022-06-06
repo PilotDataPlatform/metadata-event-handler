@@ -13,10 +13,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
+from MetadataConsumer import MetadataConsumer
 
-from dotenv import load_dotenv
-
-load_dotenv('.env')
-KAKFA_SERVICE = os.getenv('KAFKA_SERVICE')
-ELASTICSEARCH_SERVICE = os.getenv('ELASTICSEARCH_SERVICE')
+print('Metadata event handler started')
+consumer = MetadataConsumer()
+consumer.run()

@@ -13,10 +13,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
+FROM python:3.10
 
-from dotenv import load_dotenv
+WORKDIR /usr/src/app
+COPY . .
 
-load_dotenv('.env')
-KAKFA_SERVICE = os.getenv('KAFKA_SERVICE')
-ELASTICSEARCH_SERVICE = os.getenv('ELASTICSEARCH_SERVICE')
+RUN pip install --no-cache-dir poetry==1.1.12
+RUN poetry config virtualenvs.create false
+RUN poetry install --no-dev --no-root --no-interaction
+
+CMD [ "python", "./run.py" ]
