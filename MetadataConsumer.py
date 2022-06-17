@@ -90,7 +90,7 @@ class MetadataConsumer:
 
     def parse_item_activity_message(self, message):
         item_id = message['payload']['item_id']
-        print(f'Consumed activity event event ({item_id})')
+        print(f'Consumed activity event ({item_id})')
         es_item = ESItemActivityModel()
         es_item.activity_type = message['payload']['activity_type']
         es_item.activity_time = message['payload']['activity_time']
