@@ -13,10 +13,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv('.env')
 KAKFA_SERVICE = os.getenv('KAFKA_SERVICE')
+KAFKA_TOPICS = json.loads(os.getenv('KAFKA_TOPICS'))
 ELASTICSEARCH_SERVICE = os.getenv('ELASTICSEARCH_SERVICE')
+
