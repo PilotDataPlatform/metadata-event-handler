@@ -1,0 +1,44 @@
+{
+  "type": "record",
+  "name": "Extended",
+  "namespace": "metadata.items",
+  "fields": [
+    {
+      "name": "item_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+  	}, {
+      "name": "extra",
+      "type": {
+        "type": "record",
+        "name": "extra",
+        "fields": [
+          {
+          "name": "tags",
+          "type": {
+            "type": "array",
+            "items": "string"
+          }
+      }, {
+          "name": "system_tags",
+          "type": {
+            "type": "array",
+            "items": "string"
+        }
+      }, {
+          "name": "attributes",
+          "type": {
+            "type": "map",
+            "name": "attributes",
+            "values": [
+              {
+                "type": "map",
+                "values": "string"
+          }]
+        }
+      }]
+    }
+  } ]
+}

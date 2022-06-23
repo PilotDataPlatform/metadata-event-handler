@@ -13,18 +13,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import json
 from typing import Union
 
 from elasticsearch import Elasticsearch
 from kafka3 import KafkaConsumer
 
 from config import ELASTICSEARCH_SERVICE
-from config import KAKFA_SERVICE
 from config import KAFKA_TOPICS
-from ESItemModel import ESItemModel
+from config import KAKFA_SERVICE
 from ESItemActivityModel import ESItemActivityModel
-from utils import decode_path_from_ltree
+from ESItemModel import ESItemModel
+from utils import convert_timestamp
+from utils import decode_message
+from utils import publish_dlq
 
 es_index = {ESItemModel: 'metadata-items', ESItemActivityModel: 'items-activity-logs'}
 
@@ -44,25 +45,25 @@ class MetadataConsumer:
         es_client.close()
 
     def parse_items_message(self, message):
-        item_id = message['payload']['id']
+        item_id = message['id']
         print(f'Consumed items event ({item_id})')
         es_item = ESItemModel()
         if item_id in self.pending_items:
             es_item = self.pending_items[item_id]
         es_item.id = item_id
-        es_item.parent = message['payload']['parent']
-        es_item.parent_path = decode_path_from_ltree(message['payload']['parent_path'])
-        es_item.restore_path = decode_path_from_ltree(message['payload']['restore_path'])
-        es_item.archived = message['payload']['archived']
-        es_item.type = message['payload']['type']
-        es_item.zone = message['payload']['zone']
-        es_item.name = message['payload']['name']
-        es_item.size = message['payload']['size']
-        es_item.owner = message['payload']['owner']
-        es_item.container_code = message['payload']['container_code']
-        es_item.container_type = message['payload']['container_type']
-        es_item.created_time = message['payload']['created_time']
-        es_item.last_updated_time = message['payload']['last_updated_time']
+        es_item.parent = message['parent']
+        es_item.parent_path = message['parent_path']
+        es_item.restore_path = message['restore_path']
+        es_item.archived = message['archived']
+        es_item.type = message['type']
+        es_item.zone = message['zone']
+        es_item.name = message['name']
+        es_item.size = message['size']
+        es_item.owner = message['owner']
+        es_item.container_code = message['container_code']
+        es_item.container_type = message['container_type']
+        es_item.created_time = convert_timestamp(message['created_time'])
+        es_item.last_updated_time = convert_timestamp(message['last_updated_time'])
         es_item.items_set = True
         if es_item.is_complete():
             self.pending_items.pop(item_id)
@@ -71,13 +72,13 @@ class MetadataConsumer:
             self.pending_items[item_id] = es_item
 
     def parse_extended_message(self, message):
-        item_id = message['payload']['item_id']
+        item_id = message['item_id']
         print(f'Consumed extended event ({item_id})')
         es_item = ESItemModel()
         if item_id in self.pending_items:
             es_item = self.pending_items[item_id]
         es_item.id = item_id
-        item_extra = json.loads(message['payload']['extra'])
+        item_extra = message['extra']
         es_item.tags = item_extra['tags']
         es_item.system_tags = item_extra['system_tags']
         es_item.attributes = item_extra['attributes']
@@ -89,30 +90,34 @@ class MetadataConsumer:
             self.pending_items[item_id] = es_item
 
     def parse_item_activity_message(self, message):
-        item_id = message['payload']['item_id']
+        item_id = message['item_id']
         print(f'Consumed activity event ({item_id})')
         es_item = ESItemActivityModel()
-        es_item.activity_type = message['payload']['activity_type']
-        es_item.activity_time = message['payload']['activity_time']
-        es_item.item_id = message['payload']['item_id']
-        es_item.item_type = message['payload']['item_type']
-        es_item.item_name = message['payload']['item_name']
-        es_item.item_parent_path = decode_path_from_ltree(message['payload']['item_parent_path'])
-        es_item.container_code = message['payload']['container_code']
-        es_item.container_type = message['payload']['container_type']
-        es_item.zone = message['payload']['zone']
-        es_item.user = message['payload']['user']
-        es_item.imported_from = message['payload']['imported_from']
-        es_item.changes = message['payload']['changes']
+        es_item.activity_type = message['activity_type']
+        es_item.activity_time = convert_timestamp(message['activity_time'])
+        es_item.item_id = message['item_id']
+        es_item.item_type = message['item_type']
+        es_item.item_name = message['item_name']
+        es_item.item_parent_path = message['item_parent_path']
+        es_item.container_code = message['container_code']
+        es_item.container_type = message['container_type']
+        es_item.zone = message['zone']
+        es_item.user = message['user']
+        es_item.imported_from = message['imported_from']
+        es_item.changes = message['changes']
         self.write_item_to_es(es_item, item_id)
 
     def run(self):
         print('Running consumer')
         for event in self.consumer:
-            message = json.loads(event.value)
-            if message['schema']['name'] == 'metadata.metadata.items.Value':
-                self.parse_items_message(message)
-            elif message['schema']['name'] == 'metadata.metadata.extended.Value':
-                self.parse_extended_message(message)
-            elif message['schema']['name'] == 'metadata.items.activity':
-                self.parse_item_activity_message(message)
+            topic = event.topic
+            message = decode_message(message=event.value, topic=topic)
+            if not message:
+                publish_dlq(event.value)
+            else:
+                if topic == 'metadata.metadata.items':
+                    self.parse_items_message(message)
+                elif topic == 'metadata.metadata.extended':
+                    self.parse_extended_message(message)
+                elif topic == 'metadata.items.activity':
+                    self.parse_item_activity_message(message)

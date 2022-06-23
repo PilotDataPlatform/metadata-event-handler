@@ -9,6 +9,7 @@ python = "^3.6"
 kafka-python3 = "3.0.0"
 elasticsearch = "7.8.1"
 python-dotenv = "0.20.0"
+avro = "^1.11.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

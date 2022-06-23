@@ -12,9 +12,18 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import base64
+import io
 import math
+from datetime import datetime
+
+from avro import schema
+from avro.io import BinaryDecoder
+from avro.io import DatumReader
+from avro.io import validate
+from kafka import KafkaProducer
+
+from config import KAKFA_SERVICE
 
 
 def decode_label_from_ltree(encoded_string: str) -> str:
@@ -32,3 +41,36 @@ def decode_path_from_ltree(encoded_path: str) -> str:
         for label in labels:
             path += f'{decode_label_from_ltree(label)}.'
         return path[:-1]
+
+
+def convert_timestamp(timestamp: datetime) -> str:
+    converted = str(int(datetime.timestamp(timestamp)) * 1000)
+    return converted
+
+
+def publish_dlq(message: bytes):
+    producer = KafkaProducer(bootstrap_servers=[KAKFA_SERVICE])
+    producer.send('metadata.dlq', message)
+
+
+def decode_message(message: bytes, topic: str) -> dict:
+    try:
+        imported_schema = schema.parse(open(f'kafka_schema/{topic}.avsc', 'rb').read())
+        schema_reader = DatumReader(imported_schema)
+        bytes_reader = io.BytesIO(message)
+        avro_decoder = BinaryDecoder(bytes_reader)
+        message_decoded = schema_reader.read(avro_decoder)
+
+        # prevent writers schema changes to be promotable to readers schema
+        validater = validate(imported_schema, message_decoded)
+        if not validater:
+            return {}
+
+        # validate path format, as avro schema cannot validate ltree/path_serializer:
+        for key in message_decoded.keys():
+            if key in ['parent_path', 'restore_path', 'item_parent_path']:
+                message_decoded[key] = decode_path_from_ltree(message_decoded[key])
+
+    except Exception:
+        return {}
+    return message_decoded
