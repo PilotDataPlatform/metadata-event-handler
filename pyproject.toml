@@ -6,10 +6,10 @@ authors = ["Indoc Research"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
-elasticsearch = "7.8.1"
 python-dotenv = "0.20.0"
 fastavro = "^1.5.2"
 aiokafka = "^0.7.2"
+elasticsearch = {version = "^7.8.0", extras = ["async"]}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
