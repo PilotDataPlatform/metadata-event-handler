@@ -62,8 +62,8 @@ class MetadataConsumer:
         es_item.owner = message['owner']
         es_item.container_code = message['container_code']
         es_item.container_type = message['container_type']
-        es_item.created_time = convert_timestamp(message['created_time'])
-        es_item.last_updated_time = convert_timestamp(message['last_updated_time'])
+        es_item.created_time = message['created_time']
+        es_item.last_updated_time = message['last_updated_time']
         es_item.items_set = True
         if es_item.is_complete():
             self.pending_items.pop(item_id)

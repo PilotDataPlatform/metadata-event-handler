@@ -14,6 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import base64
 import io
+import json
 import math
 from datetime import datetime
 
@@ -55,18 +56,26 @@ def publish_dlq(message: bytes):
 
 def decode_message(message: bytes, topic: str) -> dict:
     try:
-        imported_schema = schema.parse(open(f'kafka_schema/{topic}.avsc', 'rb').read())
-        schema_reader = DatumReader(imported_schema)
-        bytes_reader = io.BytesIO(message)
-        avro_decoder = BinaryDecoder(bytes_reader)
-        message_decoded = schema_reader.read(avro_decoder)
+        if topic == 'metadata.items.activity':
+            imported_schema = schema.parse(open(f'kafka_schema/{topic}.avsc', 'rb').read())
+            schema_reader = DatumReader(imported_schema)
+            bytes_reader = io.BytesIO(message)
+            avro_decoder = BinaryDecoder(bytes_reader)
+            message_decoded = schema_reader.read(avro_decoder)
 
-        # prevent writers schema changes to be promotable to readers schema
-        validater = validate(imported_schema, message_decoded)
-        if not validater:
-            return {}
+            # prevent writers schema changes to be promotable to readers schema
+            validater = validate(imported_schema, message_decoded)
+            if not validater:
+                return {}
 
-        # validate path format, as avro schema cannot validate ltree/path_serializer:
+        else:
+            message_reader = json.loads(message)
+            message_decoded = message_reader['payload']
+            if 'extra' in message_decoded:
+                item_extra = json.loads(message_decoded['extra'])
+                message_decoded['extra'] = item_extra
+
+        # validate path format. Avro schema cannot validate ltree/path_serializer:
         for key in message_decoded.keys():
             if key in ['parent_path', 'restore_path', 'item_parent_path']:
                 message_decoded[key] = decode_path_from_ltree(message_decoded[key])
