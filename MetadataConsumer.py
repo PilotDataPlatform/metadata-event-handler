@@ -17,6 +17,7 @@ from typing import Union
 
 from elasticsearch import Elasticsearch
 from kafka3 import KafkaConsumer
+from kafka3 import KafkaProducer
 
 from config import ELASTICSEARCH_SERVICE
 from config import KAFKA_TOPICS
@@ -25,7 +26,6 @@ from ESItemActivityModel import ESItemActivityModel
 from ESItemModel import ESItemModel
 from utils import convert_timestamp
 from utils import decode_message
-from utils import publish_dlq
 
 es_index = {ESItemModel: 'metadata-items', ESItemActivityModel: 'items-activity-logs'}
 
@@ -34,6 +34,7 @@ class MetadataConsumer:
     def __init__(self):
         self.consumer = KafkaConsumer(bootstrap_servers=[KAKFA_SERVICE])
         self.consumer.subscribe(KAFKA_TOPICS)
+        self.producer = KafkaProducer(bootstrap_servers=[KAKFA_SERVICE])
         self.pending_items = {}
 
     def write_item_to_es(self, es_item: Union[ESItemModel, ESItemActivityModel], item_id: str):
@@ -113,7 +114,8 @@ class MetadataConsumer:
             topic = event.topic
             message = decode_message(message=event.value, topic=topic)
             if not message:
-                publish_dlq(event.value)
+                # push to dead letter queue
+                self.producer.send('metadata.dlq', event.value)
             else:
                 if topic == 'metadata.metadata.items':
                     self.parse_items_message(message)

@@ -22,7 +22,6 @@ from avro import schema
 from avro.io import BinaryDecoder
 from avro.io import DatumReader
 from avro.io import validate
-from kafka import KafkaProducer
 
 from config import KAKFA_SERVICE
 
@@ -47,11 +46,6 @@ def decode_path_from_ltree(encoded_path: str) -> str:
 def convert_timestamp(timestamp: datetime) -> str:
     converted = str(int(datetime.timestamp(timestamp)) * 1000)
     return converted
-
-
-def publish_dlq(message: bytes):
-    producer = KafkaProducer(bootstrap_servers=[KAKFA_SERVICE])
-    producer.send('metadata.dlq', message)
 
 
 def decode_message(message: bytes, topic: str) -> dict:
