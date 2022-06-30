@@ -69,4 +69,3 @@ def decode_message(message: bytes, topic: str) -> dict:
     except Exception:
         return {}
     return message_decoded
-

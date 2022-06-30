@@ -13,22 +13,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Union
 from typing import Optional
+from typing import Union
 
-from elasticsearch import AsyncElasticsearch
 from aiokafka import AIOKafkaConsumer
 from aiokafka import AIOKafkaProducer
+from elasticsearch import AsyncElasticsearch
 
 from config import ELASTICSEARCH_SERVICE
 from config import KAFKA_TOPICS
 from config import KAKFA_SERVICE
-from ESItemActivityModel import ESItemActivityModel
+from dependencies.elastic_search import insert_doc
 from ESDatasetActivityModel import ESDatasetActivityModel
+from ESItemActivityModel import ESItemActivityModel
 from ESItemModel import ESItemModel
 from utils import convert_timestamp
 from utils import decode_message
-from dependencies.elastic_search import insert_doc
 
 es_index = {ESItemModel: 'metadata-items', ESItemActivityModel: 'items-activity-logs',
             ESDatasetActivityModel: 'datasets-activity-logs'}

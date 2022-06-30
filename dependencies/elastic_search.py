@@ -16,13 +16,14 @@ from datetime import datetime
 from typing import Optional
 
 from elasticsearch import AsyncElasticsearch
+
 from utils import convert_timestamp
 
 
 async def insert_doc(index: str, message: dict, client: AsyncElasticsearch, item_id: Optional[str] = None):
     if item_id:
         # check if item already exists in elasticsearch
-        search_es = await client.search(index=index, query={"match": {"id": item_id}})
+        search_es = await client.search(index=index, query={'match': {'id': item_id}})
         search_hits = search_es['hits']['total']['value']
         if not search_hits:
             await client.index(index=index, body=message)
