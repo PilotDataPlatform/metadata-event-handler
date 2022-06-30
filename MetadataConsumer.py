@@ -14,6 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from typing import Union
+from typing import Optional
 
 from elasticsearch import AsyncElasticsearch
 from aiokafka import AIOKafkaConsumer
@@ -27,6 +28,7 @@ from ESDatasetActivityModel import ESDatasetActivityModel
 from ESItemModel import ESItemModel
 from utils import convert_timestamp
 from utils import decode_message
+from dependencies.elastic_search import insert_doc
 
 es_index = {ESItemModel: 'metadata-items', ESItemActivityModel: 'items-activity-logs',
             ESDatasetActivityModel: 'datasets-activity-logs'}
@@ -36,13 +38,16 @@ class MetadataConsumer:
     def __init__(self):
         self.pending_items = {}
 
-    async def write_to_es(self, es_doc: Union[ESItemModel, ESItemActivityModel, ESDatasetActivityModel]):
+    async def write_to_es(self, es_doc: Union[ESItemModel, ESItemActivityModel, ESDatasetActivityModel],
+                          item_id: Optional[str] = None):
         print('Writing to elastic search')
         es_client = AsyncElasticsearch(ELASTICSEARCH_SERVICE)
         doc = es_doc.to_dict()
         index = es_index[type(es_doc)]
-        await es_client.index(index=index, body=doc)
-        await es_client.close()
+        if item_id:
+            await insert_doc(index=index, item_id=item_id, message=doc, client=es_client)
+        else:
+            await insert_doc(index=index, message=doc, client=es_client)
 
     async def parse_items_message(self, message):
         item_id = message['id']
@@ -65,11 +70,14 @@ class MetadataConsumer:
         es_item.created_time = message['created_time']
         es_item.last_updated_time = message['last_updated_time']
         es_item.items_set = True
-        if es_item.is_complete():
-            self.pending_items.pop(item_id)
-            await self.write_to_es(es_item)
-        else:
-            self.pending_items[item_id] = es_item
+        if not all([es_item.archived, es_item.parent_path]):
+            if es_item.is_complete():
+                self.pending_items.pop(item_id)
+                await self.write_to_es(es_item, item_id)
+            elif es_item.archived:
+                await self.write_to_es(es_item, item_id)
+            else:
+                self.pending_items[item_id] = es_item
 
     async def parse_extended_message(self, message):
         item_id = message['item_id']
@@ -85,7 +93,7 @@ class MetadataConsumer:
         es_item.extended_set = True
         if es_item.is_complete():
             self.pending_items.pop(item_id)
-            await self.write_to_es(es_item)
+            await self.write_to_es(es_item, item_id)
         else:
             self.pending_items[item_id] = es_item
 
@@ -143,4 +151,3 @@ class MetadataConsumer:
         finally:
             await self.consumer.stop()
             await self.producer.stop()
-
