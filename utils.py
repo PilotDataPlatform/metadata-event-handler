@@ -18,12 +18,10 @@ import json
 import math
 from datetime import datetime
 
-from avro import schema
-from avro.io import BinaryDecoder
-from avro.io import DatumReader
-from avro.io import validate
 
-from config import KAKFA_SERVICE
+from fastavro import schema
+from fastavro import schemaless_reader
+from fastavro import validate
 
 
 def decode_label_from_ltree(encoded_string: str) -> str:
@@ -50,18 +48,14 @@ def convert_timestamp(timestamp: datetime) -> str:
 
 def decode_message(message: bytes, topic: str) -> dict:
     try:
-        if topic == 'metadata.items.activity':
-            imported_schema = schema.parse(open(f'kafka_schema/{topic}.avsc', 'rb').read())
-            schema_reader = DatumReader(imported_schema)
-            bytes_reader = io.BytesIO(message)
-            avro_decoder = BinaryDecoder(bytes_reader)
-            message_decoded = schema_reader.read(avro_decoder)
-
+        if topic in ['metadata.items.activity', 'dataset.activity']:
+            imported_schema = schema.load_schema(f'kafka_schema/{topic}.avsc')
+            message_reader = io.BytesIO(message)
+            message_decoded = schemaless_reader(message_reader, imported_schema)
             # prevent writers schema changes to be promotable to readers schema
-            validater = validate(imported_schema, message_decoded)
+            validater = validate(message_decoded, imported_schema, raise_errors=False)
             if not validater:
                 return {}
-
         else:
             message_reader = json.loads(message)
             message_decoded = message_reader['payload']
@@ -73,7 +67,7 @@ def decode_message(message: bytes, topic: str) -> dict:
         for key in message_decoded.keys():
             if key in ['parent_path', 'restore_path', 'item_parent_path']:
                 message_decoded[key] = decode_path_from_ltree(message_decoded[key])
-
     except Exception:
         return {}
     return message_decoded
+

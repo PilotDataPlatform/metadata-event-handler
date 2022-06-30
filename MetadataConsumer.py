@@ -15,37 +15,36 @@
 
 from typing import Union
 
-from elasticsearch import Elasticsearch
-from kafka3 import KafkaConsumer
-from kafka3 import KafkaProducer
+from elasticsearch import AsyncElasticsearch
+from aiokafka import AIOKafkaConsumer
+from aiokafka import AIOKafkaProducer
 
 from config import ELASTICSEARCH_SERVICE
 from config import KAFKA_TOPICS
 from config import KAKFA_SERVICE
 from ESItemActivityModel import ESItemActivityModel
+from ESDatasetActivityModel import ESDatasetActivityModel
 from ESItemModel import ESItemModel
 from utils import convert_timestamp
 from utils import decode_message
 
-es_index = {ESItemModel: 'metadata-items', ESItemActivityModel: 'items-activity-logs'}
+es_index = {ESItemModel: 'metadata-items', ESItemActivityModel: 'items-activity-logs',
+            ESDatasetActivityModel: 'datasets-activity-logs'}
 
 
 class MetadataConsumer:
     def __init__(self):
-        self.consumer = KafkaConsumer(bootstrap_servers=[KAKFA_SERVICE])
-        self.consumer.subscribe(KAFKA_TOPICS)
-        self.producer = KafkaProducer(bootstrap_servers=[KAKFA_SERVICE])
         self.pending_items = {}
 
-    def write_item_to_es(self, es_item: Union[ESItemModel, ESItemActivityModel], item_id: str):
-        print(f'Writing to ElasticSearch ({item_id})')
-        es_client = Elasticsearch(ELASTICSEARCH_SERVICE)
-        doc = es_item.to_dict()
-        index = es_index[type(es_item)]
-        es_client.index(index=index, body=doc)
-        es_client.close()
+    async def write_to_es(self, es_doc: Union[ESItemModel, ESItemActivityModel, ESDatasetActivityModel]):
+        print('Writing to elastic search')
+        es_client = AsyncElasticsearch(ELASTICSEARCH_SERVICE)
+        doc = es_doc.to_dict()
+        index = es_index[type(es_doc)]
+        await es_client.index(index=index, body=doc)
+        await es_client.close()
 
-    def parse_items_message(self, message):
+    async def parse_items_message(self, message):
         item_id = message['id']
         print(f'Consumed items event ({item_id})')
         es_item = ESItemModel()
@@ -68,11 +67,11 @@ class MetadataConsumer:
         es_item.items_set = True
         if es_item.is_complete():
             self.pending_items.pop(item_id)
-            self.write_item_to_es(es_item, item_id)
+            await self.write_to_es(es_item)
         else:
             self.pending_items[item_id] = es_item
 
-    def parse_extended_message(self, message):
+    async def parse_extended_message(self, message):
         item_id = message['item_id']
         print(f'Consumed extended event ({item_id})')
         es_item = ESItemModel()
@@ -86,11 +85,11 @@ class MetadataConsumer:
         es_item.extended_set = True
         if es_item.is_complete():
             self.pending_items.pop(item_id)
-            self.write_item_to_es(es_item, item_id)
+            await self.write_to_es(es_item)
         else:
             self.pending_items[item_id] = es_item
 
-    def parse_item_activity_message(self, message):
+    async def parse_item_activity_message(self, message):
         item_id = message['item_id']
         print(f'Consumed activity event ({item_id})')
         es_item = ESItemActivityModel()
@@ -106,20 +105,42 @@ class MetadataConsumer:
         es_item.user = message['user']
         es_item.imported_from = message['imported_from']
         es_item.changes = message['changes']
-        self.write_item_to_es(es_item, item_id)
+        await self.write_to_es(es_item)
 
-    def run(self):
+    async def parse_dataset_activity_message(self, message):
+        es_dataset = ESDatasetActivityModel()
+        es_dataset.activity_type = message['activity_type']
+        es_dataset.activity_time = convert_timestamp(message['activity_time'])
+        es_dataset.container_code = message['container_code']
+        es_dataset.target_name = message['target_name']
+        es_dataset.version = message['version']
+        es_dataset.user = message['user']
+        es_dataset.changes = message['changes']
+        await self.write_to_es(es_dataset)
+
+    async def run(self):
         print('Running consumer')
-        for event in self.consumer:
-            topic = event.topic
-            message = decode_message(message=event.value, topic=topic)
-            if not message:
-                # push to dead letter queue
-                self.producer.send('metadata.dlq', event.value)
-            else:
-                if topic == 'metadata.metadata.items':
-                    self.parse_items_message(message)
-                elif topic == 'metadata.metadata.extended':
-                    self.parse_extended_message(message)
-                elif topic == 'metadata.items.activity':
-                    self.parse_item_activity_message(message)
+        self.consumer = AIOKafkaConsumer(bootstrap_servers=[KAKFA_SERVICE])
+        self.consumer.subscribe(KAFKA_TOPICS)
+        self.producer = AIOKafkaProducer(bootstrap_servers=[KAKFA_SERVICE])
+        await self.consumer.start()
+        await self.producer.start()
+        try:
+            async for event in self.consumer:
+                topic = event.topic
+                message = decode_message(message=event.value, topic=topic)
+                if not message:
+                    await self.producer.send_and_wait('metadata.dlq', event.value)
+                else:
+                    if topic == 'metadata.metadata.items':
+                        await self.parse_items_message(message)
+                    elif topic == 'metadata.metadata.extended':
+                        await self.parse_extended_message(message)
+                    elif topic == 'metadata.items.activity':
+                        await self.parse_item_activity_message(message)
+                    elif topic == 'dataset.activity':
+                        await self.parse_dataset_activity_message(message)
+        finally:
+            await self.consumer.stop()
+            await self.producer.stop()
+
