@@ -1,0 +1,59 @@
+{
+  "type": "record",
+  "name": "Items",
+  "namespace": "metadata.items",
+  "fields": [
+    {
+      "name": "id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    }, {
+      "name": "parent",
+      "type": ["string", "null"]
+    }, {
+      "name": "parent_path",
+      "type": ["string", "null"]
+    }, {
+      "name": "restore_path",
+      "type": ["string", "null"]
+    }, {
+      "name": "archived",
+      "type": "boolean"
+    }, {
+      "name": "type",
+      "type": "string"
+    }, {
+      "name": "zone",
+      "type": "int"
+    }, {
+      "name": "name",
+      "type": "string"
+    }, {
+      "name": "size",
+      "type": "int"
+    }, {
+      "name": "owner",
+      "type": "string"
+    }, {
+      "name": "container_code",
+      "type": "string"
+    }, {
+      "name": "container_type",
+      "type": "string"
+    }, {
+      "name": "created_time",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }, {
+      "name": "last_updated_time",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ]
+}
