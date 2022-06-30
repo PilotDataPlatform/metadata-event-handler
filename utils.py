@@ -18,12 +18,9 @@ import json
 import math
 from datetime import datetime
 
-from aiokafka import AIOKafkaProducer
 from fastavro import schema
 from fastavro import schemaless_reader
 from fastavro import validate
-
-from config import KAKFA_SERVICE
 
 
 def decode_label_from_ltree(encoded_string: str) -> str:
@@ -46,16 +43,6 @@ def decode_path_from_ltree(encoded_path: str) -> str:
 def convert_timestamp(timestamp: datetime) -> str:
     converted = str(int(datetime.timestamp(timestamp)) * 1000)
     return converted
-
-
-async def publish_dlq(message: bytes):
-    producer = AIOKafkaProducer(bootstrap_servers=[KAKFA_SERVICE])
-    await producer.start()
-    try:
-        await producer.send_and_wait('metadata.dlq', message)
-    finally:
-        # Wait for all pending messages to be delivered
-        await producer.stop()
 
 
 def decode_message(message: bytes, topic: str) -> dict:

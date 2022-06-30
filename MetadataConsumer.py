@@ -17,6 +17,7 @@ from typing import Union
 
 from elasticsearch import AsyncElasticsearch
 from aiokafka import AIOKafkaConsumer
+from aiokafka import AIOKafkaProducer
 
 from config import ELASTICSEARCH_SERVICE
 from config import KAFKA_TOPICS
@@ -26,7 +27,6 @@ from ESDatasetActivityModel import ESDatasetActivityModel
 from ESItemModel import ESItemModel
 from utils import convert_timestamp
 from utils import decode_message
-from utils import publish_dlq
 
 es_index = {ESItemModel: 'metadata-items', ESItemActivityModel: 'items-activity-logs',
             ESDatasetActivityModel: 'datasets-activity-logs'}
@@ -122,13 +122,15 @@ class MetadataConsumer:
         print('Running consumer')
         self.consumer = AIOKafkaConsumer(bootstrap_servers=[KAKFA_SERVICE])
         self.consumer.subscribe(KAFKA_TOPICS)
+        self.producer = AIOKafkaProducer(bootstrap_servers=[KAKFA_SERVICE])
         await self.consumer.start()
+        await self.producer.start()
         try:
             async for event in self.consumer:
                 topic = event.topic
                 message = decode_message(message=event.value, topic=topic)
                 if not message:
-                    await publish_dlq(event.value)
+                    await self.producer.send_and_wait('metadata.dlq', event.value)
                 else:
                     if topic == 'metadata.metadata.items':
                         await self.parse_items_message(message)
@@ -140,3 +142,4 @@ class MetadataConsumer:
                         await self.parse_dataset_activity_message(message)
         finally:
             await self.consumer.stop()
+            await self.producer.stop()
