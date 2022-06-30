@@ -18,6 +18,7 @@ import json
 import math
 from datetime import datetime
 
+
 from fastavro import schema
 from fastavro import schemaless_reader
 from fastavro import validate
@@ -55,7 +56,6 @@ def decode_message(message: bytes, topic: str) -> dict:
             validater = validate(message_decoded, imported_schema, raise_errors=False)
             if not validater:
                 return {}
-
         else:
             message_reader = json.loads(message)
             message_decoded = message_reader['payload']
@@ -70,3 +70,4 @@ def decode_message(message: bytes, topic: str) -> dict:
     except Exception:
         return {}
     return message_decoded
+

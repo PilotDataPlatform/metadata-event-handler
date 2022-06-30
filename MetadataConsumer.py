@@ -143,3 +143,4 @@ class MetadataConsumer:
         finally:
             await self.consumer.stop()
             await self.producer.stop()
+
