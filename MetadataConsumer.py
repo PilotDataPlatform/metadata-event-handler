@@ -70,14 +70,13 @@ class MetadataConsumer:
         es_item.created_time = message['created_time']
         es_item.last_updated_time = message['last_updated_time']
         es_item.items_set = True
-        if not all([es_item.archived, es_item.parent_path]):
-            if es_item.is_complete():
-                self.pending_items.pop(item_id)
-                await self.write_to_es(es_item, item_id)
-            elif es_item.archived:
-                await self.write_to_es(es_item, item_id)
-            else:
-                self.pending_items[item_id] = es_item
+        if es_item.is_complete():
+            self.pending_items.pop(item_id)
+            await self.write_to_es(es_item, item_id)
+        elif es_item.archived:
+            await self.write_to_es(es_item, item_id)
+        else:
+            self.pending_items[item_id] = es_item
 
     async def parse_extended_message(self, message):
         item_id = message['item_id']
