@@ -62,9 +62,10 @@ def decode_message(message: bytes, topic: str) -> dict:
                 item_extra = json.loads(message_decoded['extra'])
                 message_decoded['extra'] = item_extra
                 # validate path format. Avro schema cannot validate ltree/path_serializer:
-                for key in message_decoded.keys():
-                    if key in ['parent_path', 'restore_path']:
-                        message_decoded[key] = decode_path_from_ltree(message_decoded[key])
+            for key in message_decoded.keys():
+                if key in ['parent_path', 'restore_path']:
+                    message_decoded[key] = decode_path_from_ltree(message_decoded[key])
+
     except Exception:
         return {}
     return message_decoded
