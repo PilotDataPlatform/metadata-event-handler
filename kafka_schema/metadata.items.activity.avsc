@@ -5,10 +5,10 @@
   "fields": [
     {
       "name": "item_id",
-      "type": {
+      "type": ["null", {
 	"type": "string",
 	"logicalType": "uuid"
-      }
+      }]
     }, {
       "name": "item_name",
       "type": "string"
